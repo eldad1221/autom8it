@@ -2,3 +2,6 @@
 /tests/*
 /.idea/*
 /.idea*
+/dist/
+/build/
+/autom8it.egg-info/

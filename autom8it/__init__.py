@@ -100,7 +100,7 @@ def run(run_def: dict):
             )
         else:
             raise SyntaxError(f'Missing {TASK_CLASS_KEY} definition.')
-    Log.info(f'Process finished after {Log.stopwatch_seconds(stopwatch_id=main_sw_id, print_it=False)}')
+    Log.info(f'Process finished after {Log.stopwatch_seconds(stopwatch_id=main_sw_id, print_it=False)} seconds.')
 
 
 def get_task_instance(class_name: str, parameters: dict) -> AutomationTask:

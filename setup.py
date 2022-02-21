@@ -5,8 +5,8 @@ with open("README.md", "r") as f:
     long_description = f.read()
 
 setuptools.setup(
-    name="quickbe",
-    version="0.0.1",
+    name="autom8it",
+    version="0.1.1",
     author="Eldad Bishari",
     author_email="eldad@1221tlv.org",
     description="Automate IT operations",
@@ -15,10 +15,10 @@ setuptools.setup(
     url="https://github.com/eldad1221/autom8it",
     packages=setuptools.find_packages(),
     install_requires=[
-        'PyYAML',
-        'cerberus',
-        'quickbe',
-        'boto3',
+        'PyYAML==6.0',
+        'cerberus==1.3.4',
+        'quickbe==0.1.2',
+        'boto3==1.20.41',
     ],
     classifiers=[
         "Programming Language :: Python :: 3",

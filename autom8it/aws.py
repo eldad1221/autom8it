@@ -228,3 +228,92 @@ class VerifyECSServicesCount(AutomationTask):
                 return False
         return True
 
+
+class UpdateServicesWithLastRevision(VerifyECSServicesCount):
+
+    def __init__(self, task_data: dict):
+        super().__init__(task_data=task_data)
+
+    @property
+    def task_type(self) -> str:
+        return 'Update ECS services with last revision'
+
+    def do(self):
+        result = []
+        for service in self.get_task_attribute(self.SERVICES_KEY):
+
+            desc = self.aws_client.update_service(
+                cluster=self.get_task_attribute(self.CLUSTER_KEY),
+                service=service,
+                taskDefinition=self._get_task_definition_family(service=service)
+            )
+            result.append(desc)
+
+        return result
+
+    def _get_task_definition_family(self, service: str) -> str:
+        desc = self.aws_client.describe_services(
+            cluster=self.get_task_attribute(self.CLUSTER_KEY),
+            services=[service]
+        )
+        services_desc = desc['services']
+        Log.debug(f'Services description: {services_desc}')
+        if len(services_desc) == 1:
+            return services_desc[0]['taskDefinition'].split('/')[1].split(':')[0]
+        else:
+            raise ValueError(f'Expected only one service, got {len(services_desc)}.')
+
+    def is_done(self) -> bool:
+        return True
+
+
+class ChangeTaskDefinitionContainerImage(AutomationTask):
+
+    TASK_DEFINITION_KEY = 'task_definition'
+    IMAGE_KEY = 'image'
+    CONTAINER_DEFINITIONS_KEY = 'containerDefinitions'
+
+    @property
+    def validation_schema(self) -> dict:
+        return {
+            self.TASK_DEFINITION_KEY: {
+                'required': True,
+                'type': 'string'
+            },
+            self.IMAGE_KEY: {
+                'required': True,
+                'type': 'string'
+            },
+        }
+
+    aws_client = boto3.client('ecs')
+
+    def __init__(self, task_data: dict):
+        super().__init__(task_data=task_data)
+
+    @property
+    def task_type(self) -> str:
+        return 'Create ECS Task Definition revision'
+
+    def do(self):
+        desc = self.aws_client.describe_task_definition(
+            taskDefinition=self.get_task_attribute(self.TASK_DEFINITION_KEY)
+        )
+        Log.debug(f'Task definition description: {desc}')
+        container_definitions = desc['taskDefinition'][self.CONTAINER_DEFINITIONS_KEY]
+        for container_def in container_definitions:
+            image_uri = self.get_task_attribute(self.IMAGE_KEY)
+            if ':' not in image_uri:
+                image_uri = f"{container_def[self.IMAGE_KEY].split(':')[0]}:{image_uri}"
+            container_def[self.IMAGE_KEY] = image_uri
+
+        result = self.aws_client.register_task_definition(
+            family=self.get_task_attribute(self.TASK_DEFINITION_KEY),
+            containerDefinitions=container_definitions
+        )
+
+        return result
+
+    def is_done(self) -> bool:
+        return True
+
