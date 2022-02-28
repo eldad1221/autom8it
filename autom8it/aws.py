@@ -1,8 +1,12 @@
+import datetime
+import pytz
 import boto3
 import logging
 from time import sleep
-from quickbe import Log
+from autom8it import Log
 from autom8it import AutomationTask
+
+UTC = pytz.UTC
 
 for log_name in ['boto', 'boto3', 'botocore', 's3transfer', 'urllib3']:
     logging.getLogger(log_name).setLevel(logging.WARNING)
@@ -279,14 +283,11 @@ class ChangeTaskDefinitionContainerImage(AutomationTask):
             self.TASK_DEFINITION_KEY: {
                 'required': True,
                 'type': 'string'
-            },
-            self.IMAGE_KEY: {
-                'required': True,
-                'type': 'string'
-            },
+            }
         }
 
-    aws_client = boto3.client('ecs')
+    aws_ecs_client = boto3.client('ecs')
+    aws_ecr_client = boto3.client('ecr')
 
     def __init__(self, task_data: dict):
         super().__init__(task_data=task_data)
@@ -296,18 +297,22 @@ class ChangeTaskDefinitionContainerImage(AutomationTask):
         return 'Create ECS Task Definition revision'
 
     def do(self):
-        desc = self.aws_client.describe_task_definition(
+        desc = self.aws_ecs_client.describe_task_definition(
             taskDefinition=self.get_task_attribute(self.TASK_DEFINITION_KEY)
         )
         Log.debug(f'Task definition description: {desc}')
         container_definitions = desc['taskDefinition'][self.CONTAINER_DEFINITIONS_KEY]
         for container_def in container_definitions:
-            image_uri = self.get_task_attribute(self.IMAGE_KEY)
+            image_uri = self.get_task_attribute(self.IMAGE_KEY, default=None)
+            if image_uri is None:
+                image_uri = self.get_last_image_tag(
+                    repository=self.get_repository_name(image_uri=container_def[self.IMAGE_KEY])
+                )
             if ':' not in image_uri:
                 image_uri = f"{container_def[self.IMAGE_KEY].split(':')[0]}:{image_uri}"
             container_def[self.IMAGE_KEY] = image_uri
 
-        result = self.aws_client.register_task_definition(
+        result = self.aws_ecs_client.register_task_definition(
             family=self.get_task_attribute(self.TASK_DEFINITION_KEY),
             containerDefinitions=container_definitions
         )
@@ -316,4 +321,29 @@ class ChangeTaskDefinitionContainerImage(AutomationTask):
 
     def is_done(self) -> bool:
         return True
+
+    @staticmethod
+    def get_repository_name(image_uri: str) -> str:
+        """
+        Example: 112358132134.dkr.ecr.us-east-2.amazonaws.com/my-repo:1.10.21-tag
+        Will return my-repo
+        :param image_uri:
+        :return:
+        """
+        return image_uri.split('/')[1].split(':')[0]
+
+    @staticmethod
+    def get_last_image_tag(repository: str) -> str:
+        result = ChangeTaskDefinitionContainerImage.aws_ecr_client.describe_images(
+            repositoryName=repository
+        )
+        images = {image['imageTags'][0]: image['imagePushedAt'] for image in result['imageDetails']}
+        last_date = datetime.datetime(year=1970, month=1, day=1).replace(tzinfo=UTC)
+        last_tag = None
+        for tag, date in images.items():
+            date = date.replace(tzinfo=UTC)
+            if date > last_date:
+                last_date = date
+                last_tag = tag
+        return last_tag
 
