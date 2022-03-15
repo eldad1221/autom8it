@@ -204,7 +204,7 @@ class VerifyECSServicesCount(AutomationTask):
             },
         }
 
-    aws_client = boto3.client('ecs')
+    ecs_client = boto3.client('ecs')
 
     def __init__(self, task_data: dict):
         super().__init__(task_data=task_data)
@@ -213,14 +213,17 @@ class VerifyECSServicesCount(AutomationTask):
     def task_type(self) -> str:
         return 'Verify ECS services count'
 
+    def describe_services(self) -> dict:
+        return self.ecs_client.describe_services(
+            cluster=self.get_task_attribute(self.CLUSTER_KEY),
+            services=self.get_task_attribute(self.SERVICES_KEY),
+        )
+
     def do(self):
         return 'OK'
 
     def is_done(self) -> bool:
-        desc = self.aws_client.describe_services(
-            cluster=self.get_task_attribute(self.CLUSTER_KEY),
-            services=self.get_task_attribute(self.SERVICES_KEY),
-        )
+        desc = self.describe_services()
         for service in desc[self.SERVICES_KEY]:
             desired_count = service[self.SERVICE_DESIRED_COUNT_KEY]
             running_count = service[self.SERVICE_RUNNING_COUNT_KEY]
@@ -246,7 +249,7 @@ class UpdateServicesWithLastRevision(VerifyECSServicesCount):
         result = []
         for service in self.get_task_attribute(self.SERVICES_KEY):
 
-            desc = self.aws_client.update_service(
+            desc = self.ecs_client.update_service(
                 cluster=self.get_task_attribute(self.CLUSTER_KEY),
                 service=service,
                 taskDefinition=self._get_task_definition_family(service=service)
@@ -256,7 +259,7 @@ class UpdateServicesWithLastRevision(VerifyECSServicesCount):
         return result
 
     def _get_task_definition_family(self, service: str) -> str:
-        desc = self.aws_client.describe_services(
+        desc = self.ecs_client.describe_services(
             cluster=self.get_task_attribute(self.CLUSTER_KEY),
             services=[service]
         )
@@ -347,3 +350,35 @@ class ChangeTaskDefinitionContainerImage(AutomationTask):
                 last_tag = tag
         return last_tag
 
+
+class StopServicesAndWaitUntilStarts(VerifyECSServicesCount):
+
+    def __init__(self, task_data: dict):
+        super().__init__(task_data=task_data)
+
+    @property
+    def task_type(self) -> str:
+        return 'Stop all task of ECS services wait until they starts again'
+
+    def stop_tasks(self, tasks_arn: list):
+        for task_arn in tasks_arn:
+            self.ecs_client.stop_task(
+                cluster=self.get_task_attribute(self.CLUSTER_KEY),
+                task=task_arn,
+                reason=f'Stopping service by Autom8it ({self.__class__.__name__})'
+            )
+
+    def do(self):
+        result = []
+        for service in self.get_task_attribute(self.SERVICES_KEY):
+
+            desc = self.ecs_client.list_tasks(
+                cluster=self.get_task_attribute(self.CLUSTER_KEY),
+                serviceName=service,
+                desiredStatus='RUNNING',
+            )
+            tasks_arn = desc.get('taskArns', [])
+            self.stop_tasks(tasks_arn=tasks_arn)
+            result.append(tasks_arn)
+
+        return result

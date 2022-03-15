@@ -6,7 +6,7 @@ with open("README.md", "r") as f:
 
 setuptools.setup(
     name="autom8it",
-    version="0.1.3",
+    version="1.0.0",
     author="Eldad Bishari",
     author_email="eldad@1221tlv.org",
     description="Automate IT operations",
