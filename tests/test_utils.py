@@ -36,9 +36,9 @@ class UtilsTestCase(unittest.TestCase):
 
     def test_http_task(self):
         task_data = {
-            HttpRequestTask.HTTP_METHOD: 'post',
-            HttpRequestTask.URL: 'https://hooks.slack.com/services/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',
-            HttpRequestTask.DATA: '{"text":"Hello"}'
+            HttpRequestTask.HTTP_METHOD: 'get',
+            HttpRequestTask.URL: 'http://www.google.com',
+            HttpRequestTask.DATA: {"text": "Hello"}
         }
         resp = HttpRequestTask(task_data=task_data).run()
         self.assertEqual(True, True)

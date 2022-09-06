@@ -231,6 +231,8 @@ class HttpRequestTask(AutomationTask):
     HTTP_METHOD = 'method'
     URL = 'url'
     DATA = 'data'
+    HEADERS = 'headers'
+    PARAMETERS = 'parameters'
 
     def __init__(self, task_data: dict):
         super().__init__(task_data=task_data, check_done_interval=0)
@@ -248,7 +250,13 @@ class HttpRequestTask(AutomationTask):
                 'type': 'string'
             },
             self.DATA: {
-                'type': 'string'
+                'type': ['string', 'dict']
+            },
+            self.HEADERS: {
+                'type': 'dict'
+            },
+            self.PARAMETERS: {
+                'type': 'dict'
             }
         }
 
@@ -260,11 +268,31 @@ class HttpRequestTask(AutomationTask):
         resp = 'Error'
         url = self.get_task_attribute(key=self.URL)
         http_method = self.get_task_attribute(key=self.HTTP_METHOD, default='get').lower()
+        headers = self.get_task_attribute(key=self.HEADERS, default={})
+        parameters = self.get_task_attribute(key=self.PARAMETERS, default={})
+        data = self.get_task_attribute(key=self.DATA, default='')
 
         if http_method == 'get':
-            resp = requests.get(url)
+            resp = requests.get(
+                url,
+                headers=headers,
+                params=parameters
+            )
         elif http_method == 'post':
-            resp = requests.post(url, data=self.get_task_attribute(key=self.DATA, default=''))
+            if isinstance(data, dict):
+                resp = requests.post(
+                    url,
+                    json=data,
+                    headers=headers,
+                    params=parameters
+                )
+            else:
+                resp = requests.post(
+                    url,
+                    data=data,
+                    headers=headers,
+                    params=parameters
+                )
 
         Log.debug(f'Task got HTTP response: {resp}, {resp.text}')
         return resp
