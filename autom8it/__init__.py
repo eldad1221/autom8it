@@ -1,6 +1,7 @@
 import abc
 import yaml
 import uuid
+import requests
 from time import sleep
 from datetime import datetime
 from cerberus import Validator
@@ -182,12 +183,6 @@ def run_yaml(file_path: str):
     run(run_def=run_def)
 
 
-def run_yaml(file_path: str):
-    with open(file_path, "r") as f:
-        run_def = yaml.safe_load(f)
-    run(run_def=run_def)
-
-
 TASK_CLASS_KEY = 'class'
 TASK_PARAMETERS_KEY = 'parameters'
 
@@ -227,5 +222,52 @@ def get_class_by_name(class_name: str, requested_type: object = None):
         if requested_type is not None and not issubclass(result, requested_type):
             raise ValueError(f'Class {result} does not match type {requested_type}.')
         return result
-    except (ImportError, AttributeError) as e:
+    except (ImportError, AttributeError):
         raise ImportError(class_name)
+
+
+class HttpRequestTask(AutomationTask):
+
+    HTTP_METHOD = 'method'
+    URL = 'url'
+    DATA = 'data'
+
+    def __init__(self, task_data: dict):
+        super().__init__(task_data=task_data, check_done_interval=0)
+
+    @property
+    def validation_schema(self) -> dict:
+        return {
+            self.HTTP_METHOD: {
+                'required': True,
+                'type': 'string',
+                'allowed': ['post', 'POST', 'get', 'GET']
+            },
+            self.URL: {
+                'required': True,
+                'type': 'string'
+            },
+            self.DATA: {
+                'type': 'string'
+            }
+        }
+
+    @property
+    def task_type(self) -> str:
+        return 'Send HTTP reqeust'
+
+    def do(self):
+        resp = 'Error'
+        url = self.get_task_attribute(key=self.URL)
+        http_method = self.get_task_attribute(key=self.HTTP_METHOD, default='get').lower()
+
+        if http_method == 'get':
+            resp = requests.get(url)
+        elif http_method == 'post':
+            resp = requests.post(url, data=self.get_task_attribute(key=self.DATA, default=''))
+
+        Log.debug(f'Task got HTTP response: {resp}, {resp.text}')
+        return resp
+
+    def is_done(self) -> bool:
+        return True

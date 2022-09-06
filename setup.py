@@ -6,7 +6,7 @@ with open("README.md", "r") as f:
 
 setuptools.setup(
     name="autom8it",
-    version="1.0.0",
+    version="1.2.0",
     author="Eldad Bishari",
     author_email="eldad@1221tlv.org",
     description="Automate IT operations",
@@ -19,6 +19,7 @@ setuptools.setup(
         'pytz==2021.3',
         'cerberus==1.3.4',
         'boto3==1.20.41',
+        'requests==2.27.1'
     ],
     classifiers=[
         "Programming Language :: Python :: 3",

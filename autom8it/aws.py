@@ -286,6 +286,9 @@ class ChangeTaskDefinitionContainerImage(AutomationTask):
             self.TASK_DEFINITION_KEY: {
                 'required': True,
                 'type': 'string'
+            },
+            self.IMAGE_KEY: {
+                'type': 'string'
             }
         }
 
@@ -315,9 +318,17 @@ class ChangeTaskDefinitionContainerImage(AutomationTask):
                 image_uri = f"{container_def[self.IMAGE_KEY].split(':')[0]}:{image_uri}"
             container_def[self.IMAGE_KEY] = image_uri
 
+        task_definition_desc = desc.get('taskDefinition', {})
+
         result = self.aws_ecs_client.register_task_definition(
             family=self.get_task_attribute(self.TASK_DEFINITION_KEY),
-            containerDefinitions=container_definitions
+            containerDefinitions=container_definitions,
+            taskRoleArn=task_definition_desc.get('taskRoleArn', ''),
+            executionRoleArn=task_definition_desc.get('executionRoleArn', ''),
+            networkMode=task_definition_desc.get('networkMode'),
+            volumes=task_definition_desc.get('volumes', []),
+            placementConstraints=task_definition_desc.get('placementConstraints', []),
+            requiresCompatibilities=task_definition_desc.get('requiresCompatibilities', [])
         )
 
         return result

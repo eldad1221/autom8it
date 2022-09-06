@@ -5,3 +5,4 @@
 /dist/
 /build/
 /autom8it.egg-info/
+/tests/test_deployment_automation.py
